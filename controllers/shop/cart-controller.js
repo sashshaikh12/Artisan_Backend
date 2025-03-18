@@ -1,83 +1,71 @@
+const mongoose = require("mongoose");
 const Cart = require("../../models/Cart");
 const Product = require("../../models/Product");
 
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+
+const toObjectId = (id) => new mongoose.Types.ObjectId(id);
+
+// Add to cart
 const addToCart = async (req, res) => {
   try {
     const { userId, productId, quantity } = req.body;
 
     if (!userId || !productId || quantity <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid data provided!",
-      });
+      return res.status(400).json({ success: false, message: "Invalid data provided!" });
     }
 
-    const product = await Product.findById(productId);
+    if (!isValidObjectId(userId) || !isValidObjectId(productId)) {
+      return res.status(400).json({ success: false, message: "Invalid user or product ID" });
+    }
 
+    const product = await Product.findById(toObjectId(productId));
     if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: "Product not found",
-      });
+      return res.status(404).json({ success: false, message: "Product not found" });
     }
 
-    let cart = await Cart.findOne({ userId });
-
+    let cart = await Cart.findOne({ userId: toObjectId(userId) });
     if (!cart) {
-      cart = new Cart({ userId, items: [] });
+      cart = new Cart({ userId: toObjectId(userId), items: [] });
     }
 
-    const findCurrentProductIndex = cart.items.findIndex(
+    const existingIndex = cart.items.findIndex(
       (item) => item.productId.toString() === productId
     );
 
-    if (findCurrentProductIndex === -1) {
-      cart.items.push({ productId, quantity });
+    if (existingIndex === -1) {
+      cart.items.push({ productId: toObjectId(productId), quantity });
     } else {
-      cart.items[findCurrentProductIndex].quantity += quantity;
+      cart.items[existingIndex].quantity += quantity;
     }
 
     await cart.save();
-    res.status(200).json({
-      success: true,
-      data: cart,
-    });
+    res.status(200).json({ success: true, data: cart });
   } catch (error) {
     console.log(error);
-    res.status(500).json({
-      success: false,
-      message: "Error",
-    });
+    res.status(500).json({ success: false, message: "Error" });
   }
 };
 
+// Fetch cart
 const fetchCartItems = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: "User id is manadatory!",
-      });
+    if (!userId || !isValidObjectId(userId)) {
+      return res.status(400).json({ success: false, message: "Invalid or missing user ID" });
     }
 
-    const cart = await Cart.findOne({ userId }).populate({
+    const cart = await Cart.findOne({ userId: toObjectId(userId) }).populate({
       path: "items.productId",
       select: "image title price salePrice",
     });
 
     if (!cart) {
-      return res.status(404).json({
-        success: false,
-        message: "Cart not found!",
-      });
+      return res.status(404).json({ success: false, message: "Cart not found!" });
     }
 
-    const validItems = cart.items.filter(
-      (productItem) => productItem.productId
-    );
-
+    const validItems = cart.items.filter((item) => item.productId);
     if (validItems.length < cart.items.length) {
       cart.items = validItems;
       await cart.save();
@@ -101,44 +89,33 @@ const fetchCartItems = async (req, res) => {
     });
   } catch (error) {
     console.log(error);
-    res.status(500).json({
-      success: false,
-      message: "Error",
-    });
+    res.status(500).json({ success: false, message: "Error" });
   }
 };
 
+// Update quantity
 const updateCartItemQty = async (req, res) => {
   try {
     const { userId, productId, quantity } = req.body;
 
-    if (!userId || !productId || quantity <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid data provided!",
-      });
+    if (!userId || !productId || quantity <= 0 || !isValidObjectId(userId) || !isValidObjectId(productId)) {
+      return res.status(400).json({ success: false, message: "Invalid data provided!" });
     }
 
-    const cart = await Cart.findOne({ userId });
+    const cart = await Cart.findOne({ userId: toObjectId(userId) });
     if (!cart) {
-      return res.status(404).json({
-        success: false,
-        message: "Cart not found!",
-      });
+      return res.status(404).json({ success: false, message: "Cart not found!" });
     }
 
-    const findCurrentProductIndex = cart.items.findIndex(
+    const index = cart.items.findIndex(
       (item) => item.productId.toString() === productId
     );
 
-    if (findCurrentProductIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: "Cart item not present !",
-      });
+    if (index === -1) {
+      return res.status(404).json({ success: false, message: "Cart item not present!" });
     }
 
-    cart.items[findCurrentProductIndex].quantity = quantity;
+    cart.items[index].quantity = quantity;
     await cart.save();
 
     await cart.populate({
@@ -147,11 +124,11 @@ const updateCartItemQty = async (req, res) => {
     });
 
     const populateCartItems = cart.items.map((item) => ({
-      productId: item.productId ? item.productId._id : null,
-      image: item.productId ? item.productId.image : null,
-      title: item.productId ? item.productId.title : "Product not found",
-      price: item.productId ? item.productId.price : null,
-      salePrice: item.productId ? item.productId.salePrice : null,
+      productId: item.productId?._id || null,
+      image: item.productId?.image || null,
+      title: item.productId?.title || "Product not found",
+      price: item.productId?.price || null,
+      salePrice: item.productId?.salePrice || null,
       quantity: item.quantity,
     }));
 
@@ -164,37 +141,30 @@ const updateCartItemQty = async (req, res) => {
     });
   } catch (error) {
     console.log(error);
-    res.status(500).json({
-      success: false,
-      message: "Error",
-    });
+    res.status(500).json({ success: false, message: "Error" });
   }
 };
 
+// Delete item
 const deleteCartItem = async (req, res) => {
   try {
     const { userId, productId } = req.params;
-    if (!userId || !productId) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid data provided!",
-      });
+
+    if (!userId || !productId || !isValidObjectId(userId) || !isValidObjectId(productId)) {
+      return res.status(400).json({ success: false, message: "Invalid data provided!" });
     }
 
-    const cart = await Cart.findOne({ userId }).populate({
+    const cart = await Cart.findOne({ userId: toObjectId(userId) }).populate({
       path: "items.productId",
       select: "image title price salePrice",
     });
 
     if (!cart) {
-      return res.status(404).json({
-        success: false,
-        message: "Cart not found!",
-      });
+      return res.status(404).json({ success: false, message: "Cart not found!" });
     }
 
     cart.items = cart.items.filter(
-      (item) => item.productId._id.toString() !== productId
+      (item) => item.productId?._id.toString() !== productId
     );
 
     await cart.save();
@@ -205,11 +175,11 @@ const deleteCartItem = async (req, res) => {
     });
 
     const populateCartItems = cart.items.map((item) => ({
-      productId: item.productId ? item.productId._id : null,
-      image: item.productId ? item.productId.image : null,
-      title: item.productId ? item.productId.title : "Product not found",
-      price: item.productId ? item.productId.price : null,
-      salePrice: item.productId ? item.productId.salePrice : null,
+      productId: item.productId?._id || null,
+      image: item.productId?.image || null,
+      title: item.productId?.title || "Product not found",
+      price: item.productId?.price || null,
+      salePrice: item.productId?.salePrice || null,
       quantity: item.quantity,
     }));
 
@@ -222,10 +192,7 @@ const deleteCartItem = async (req, res) => {
     });
   } catch (error) {
     console.log(error);
-    res.status(500).json({
-      success: false,
-      message: "Error",
-    });
+    res.status(500).json({ success: false, message: "Error" });
   }
 };
 
