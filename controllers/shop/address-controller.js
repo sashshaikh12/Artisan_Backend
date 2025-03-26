@@ -134,3 +134,10 @@ const deleteAddress = async (req, res) => {
 };
 
 module.exports = { addAddress, editAddress, fetchAllAddress, deleteAddress };
+
+
+//hell0o \
+//bhai
+//kya ho rha hai
+//jab mera naam
+
