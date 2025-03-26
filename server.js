@@ -26,7 +26,7 @@ mongoose
   .catch((error) => console.log(error));
 
 const app = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT||4000;
 
  
 app.use(
