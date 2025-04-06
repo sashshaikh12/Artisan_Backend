@@ -66,14 +66,14 @@ const loginUser = async (req, res) => {
         userName: checkUser.userName,
       },
       process.env.CLIENT_SECRET_KEY,
-      { expiresIn: "60m" }
+      { expiresIn: "1h" }
     );
 
     res.cookie("token", token, {
       httpOnly: true, 
-      secure: false,
-      sameSite: 'Lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, 
+      secure: true,
+      sameSite: 'none',
+      maxAge: 60 * 60 * 1000, // 1 hour
      }).json({
       success: true,
       message: "Logged in successfully",

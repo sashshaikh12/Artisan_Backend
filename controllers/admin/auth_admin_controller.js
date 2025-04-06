@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../../models/User");
+const { max } = require("three/tsl");
 require('dotenv').config();
 
 // Admin Register
@@ -67,13 +68,14 @@ const loginAdmin = async (req, res) => {
         userName: adminUser.userName,
       },
       process.env.CLIENT_SECRET_KEY,
-      { expiresIn: "60m" }
+      { expiresIn: "1h" } // Token expiration time
     );
 
     res.cookie("token", token, { 
       httpOnly: true,
       secure: true,
       sameSite: "None", 
+      maxAge: 60 * 60 * 1000, // 1 hour
     }).json({
       success: true,
       message: "Admin logged in successfully",
